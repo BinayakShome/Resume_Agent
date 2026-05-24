@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ATS Scout</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #3b82f6;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 { margin-bottom: 10px; font-size: 2.5rem; }
+        p { color: var(--text-muted); }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: var(--text);
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover { background-color: #2563eb; }
+
+        #loading { display: none; text-align: center; color: var(--accent); margin: 20px 0; }
+
+        #results { display: none; }
+
+        .score-box {
+            display: inline-block;
+            padding: 15px 25px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border-radius: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .suggestion-item {
+            border-left: 4px solid var(--accent);
+            padding-left: 15px;
+            margin: 15px 0;
+        }
+
+        .original { color: var(--text-muted); text-decoration: line-through; font-size: 0.95rem;}
+        .improved { color: var(--success); font-weight: 500; margin-top: 4px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Resume ATS Checker</h1>
+        <p>Upload your resume to get an instant ATS optimization breakdown</p>
+    </header>
+
+    <div class="card">
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="role">Target Industry</label>
+                <select id="role" name="role">
+                    <option value="Software Engineer">Software Engineer</option>
+                    <option value="Data Scientist">Data Scientist</option>
+                    <option value="Product Manager">Product Manager</option>
+                    <option value="Backend Developer">Backend Developer</option>
+                    <option value="ML Engineer">ML Engineer</option>
+                    <option value="Android Developer">Android Developer</option>
+                    <option value="Web Developer">Web Developer</option>
+                    <option value="Frontend Developer">Frontend Developer</option>
+                    <option value="Fintech">Fintech</option>
+                    <option value="Edtech">Edtech</option>
+                    <option value="Sales(Non - tech)">Sales</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="resume">Upload Resume (PDF or DOCX)</label>
+                <input type="file" id="resume" name="resume" accept=".pdf,.docx" required>
+            </div>
+            <button type="submit" id="submitBtn">Analyze Resume</button>
+        </form>
+    </div>
+
+    <div id="loading">Processing resume ... Please wait...</div>
+
+    <div id="results" class="card">
+        <h2>Analysis Results</h2>
+        <div id="score" class="score-box"></div>
+
+        <h3>Overall Summary</h3>
+        <p id="summary"></p>
+
+        <h3>Critical Missing Skills</h3>
+        <p id="missingSkills"></p>
+
+        <h3>Suggested Changes</h3>
+        <div id="suggestionsList"></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('role', document.getElementById('role').value);
+        formData.append('resume', document.getElementById('resume').files[0]);
+
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('results').style.display = 'none';
+
+        try {
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            // Populate elements
+            document.getElementById('score').innerText = `ATS Score: ${data.ats_score}%`;
+            document.getElementById('summary').innerText = data.overall_summary;
+            document.getElementById('missingSkills').innerText = data.critical_missing_skills.join(', ') || 'None!';
+
+            // Build suggestions mapping
+            const suggestionsDiv = document.getElementById('suggestionsList');
+            suggestionsDiv.innerHTML = '';
+            data.suggested_bullet_point_improvements.forEach(item => {
+                suggestionsDiv.innerHTML += `
+                    <div class="suggestion-item">
+                        <div class="original"><b>Original:</b> ${item.original}</div>
+                        <div class="improved"><b>Improved:</b> ${item.improved}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('results').style.display = 'block';
+        } catch (error) {
+            alert('An error occurred during parsing.');
+        } finally {
+            document.getElementById('loading').style.display = 'none';
+        }
+    });
+</script>
+</body>
+</html>
